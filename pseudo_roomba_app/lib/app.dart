@@ -47,7 +47,7 @@ class _MyHomePageState extends State<MyHomePage> {
   vector.Vector3? lastPosition;
   vector.Vector3? secondLastPosition;
   vector.Vector3? firstPosition;
-  bool pressed = false;
+  bool pressed = true;
   int nodeCount = 0;
 
   @override
@@ -104,6 +104,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   firstPosition = null;
                   lastPosition = null;
                   nodeCount = 0;
+                  setState(() {
+                    pressed = true;
+                  });
                 }
               },
               child: Icon(Icons.refresh),

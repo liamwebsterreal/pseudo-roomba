@@ -45,6 +45,9 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   late ARKitController arkitController;
   vector.Vector3? lastPosition;
+  vector.Vector3? secondLastPosition;
+  vector.Vector3? firstPosition;
+  bool pressed = false;
   int nodeCount = 0;
 
   @override
@@ -64,16 +67,49 @@ class _MyHomePageState extends State<MyHomePage> {
             onARKitViewCreated: onARKitViewCreated,
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            for (int i = 1; i <= nodeCount; i++) {
-              arkitController.remove(i.toString());
-              arkitController.remove(i.toString());
-              arkitController.remove(i.toString());
-            }
-          },
-          child: Icon(Icons.refresh),
-          backgroundColor: Colors.blueGrey,
+        floatingActionButton: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            FloatingActionButton(
+              onPressed: () {
+                if (nodeCount > 0 && !pressed) {
+                  if (nodeCount == 1) {
+                    arkitController.remove('0');
+                    lastPosition = null;
+                    firstPosition = null;
+                    nodeCount = 0;
+                  } else {
+                    arkitController.remove((nodeCount - 1).toString());
+                    arkitController.remove((nodeCount - 1).toString());
+                    lastPosition = secondLastPosition;
+                    nodeCount -= 1;
+                  }
+                  setState(() {
+                    pressed = true;
+                  });
+                }
+              },
+              child: Icon(Icons.cancel_outlined),
+              backgroundColor: pressed ? Colors.red : Colors.blueGrey,
+            ),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+            FloatingActionButton(
+              onPressed: () {
+                if (nodeCount > 0) {
+                  arkitController.remove('0');
+                  for (int i = 1; i < nodeCount; i++) {
+                    arkitController.remove(i.toString());
+                    arkitController.remove(i.toString());
+                  }
+                  firstPosition = null;
+                  lastPosition = null;
+                  nodeCount = 0;
+                }
+              },
+              child: Icon(Icons.refresh),
+              backgroundColor: Colors.blueGrey,
+            ),
+          ],
         ),
       );
 
@@ -90,27 +126,26 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _onARTapHandler(ARKitTestResult point) {
-    nodeCount += 1;
     final position = vector.Vector3(
       point.worldTransform.getColumn(3).x,
       point.worldTransform.getColumn(3).y,
       point.worldTransform.getColumn(3).z,
     );
-    final material = ARKitMaterial(
-        lightingModelName: ARKitLightingModel.constant,
-        diffuse: ARKitMaterialProperty.color(Colors.blue));
-    final sphere = ARKitSphere(
-      radius: 0.01,
-      materials: [material],
-    );
-    final node = ARKitNode(
-      geometry: sphere,
-      position: position,
-      name: nodeCount.toString(),
-    );
-    arkitController.add(node);
-
     if (lastPosition != null) {
+      final material = ARKitMaterial(
+          lightingModelName: ARKitLightingModel.constant,
+          diffuse: ARKitMaterialProperty.color(Colors.blue));
+      final sphere = ARKitSphere(
+        radius: 0.1,
+        materials: [material],
+      );
+      final node = ARKitNode(
+        geometry: sphere,
+        position: position,
+        name: nodeCount.toString(),
+      );
+      arkitController.add(node);
+
       final line = ARKitLine(
         fromVector: lastPosition!,
         toVector: position,
@@ -123,12 +158,42 @@ class _MyHomePageState extends State<MyHomePage> {
       );
       final lineNode = ARKitNode(geometry: line, name: nodeCount.toString());
       arkitController.add(lineNode);
-
       final distance = _calculateDistanceBetweenPoints(position, lastPosition!);
-      final point = _getMiddleVector(position, lastPosition!);
-      _drawText(distance, point);
+      //final point = _getMiddleVector(position, lastPosition!);
+      //_drawText(distance, point);
+      secondLastPosition = lastPosition;
+      lastPosition = position;
+      nodeCount += 1;
+      setState(() {
+        pressed = false;
+      });
+    } else {
+      final material = ARKitMaterial(
+          lightingModelName: ARKitLightingModel.constant,
+          diffuse: ARKitMaterialProperty.color(Colors.blue));
+      final sphere = ARKitSphere(
+        radius: 0.1,
+        materials: [material],
+      );
+      final node = ARKitNode(
+        geometry: sphere,
+        position: position,
+        name: nodeCount.toString(),
+      );
+      arkitController.add(node);
+      firstPosition = position;
+      lastPosition = position;
+      nodeCount += 1;
+      setState(() {
+        pressed = false;
+      });
     }
-    lastPosition = position;
+  }
+
+  double _calculateDistanceBetweenPointsNumber(
+      vector.Vector3 A, vector.Vector3 B) {
+    final length = A.distanceTo(B);
+    return (length * 100);
   }
 
   String _calculateDistanceBetweenPoints(vector.Vector3 A, vector.Vector3 B) {

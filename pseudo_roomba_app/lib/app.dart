@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'theme/style.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:arkit_plugin/arkit_plugin.dart';
+import 'dart:math' as math;
 import 'package:vector_math/vector_math_64.dart' as vector;
 import 'package:collection/collection.dart';
 
@@ -44,6 +45,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late ARKitController arkitController;
+  ARKitPlane? plane;
   vector.Vector3? lastPosition;
   vector.Vector3? secondLastPosition;
   vector.Vector3? firstPosition;
@@ -69,9 +71,16 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             ARKitSceneView(
               enableTapRecognizer: true,
+              planeDetection: ARPlaneDetection.horizontal,
               onARKitViewCreated: onARKitViewCreated,
             ),
-            finishPressed ? Center(child: PlaneBuilder(nodes)) : Container(),
+            Center(
+              child: finishPressed
+                  ? const CircularProgressIndicator()
+                  : const CircularProgressIndicator(
+                      value: 0.0,
+                    ),
+            ),
           ],
         ),
         floatingActionButton: Column(
@@ -101,7 +110,7 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             SizedBox(height: MediaQuery.of(context).size.height * 0.01),
             FloatingActionButton(
-              onPressed: () async {
+              onPressed: () {
                 if (nodeCount > 2) {
                   final line = ARKitLine(
                     fromVector: lastPosition!,
@@ -116,14 +125,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   final lineNode =
                       ARKitNode(geometry: line, name: nodeCount.toString());
                   arkitController.add(lineNode);
-                  setState(() {
-                    finishAllowed = false;
-                  });
-                  setState(() {
-                    finishPressed = true;
-                  });
-                } else {
-                  null;
+                  finishPressed = true;
+                  _onPlaneBuilder(nodes);
                 }
               },
               child: const Icon(Icons.add_task_outlined),
@@ -143,6 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   nodeCount = 0;
                   setState(() {
                     undoAllowed = false;
+                    finishAllowed = false;
                   });
                 }
               },
@@ -235,6 +239,40 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void _onPlaneBuilder(List<ARKitNode> nodes) {
+    setState(() {
+      finishPressed = true;
+    });
+    plane = ARKitPlane(
+      width:
+          _calculateDistanceBetweenPointsNumber(firstPosition!, lastPosition!),
+      height: _calculateDistanceBetweenPointsNumber(
+          lastPosition!, secondLastPosition!),
+      materials: [
+        ARKitMaterial(
+          transparency: 0.7,
+          diffuse: ARKitMaterialProperty.color(Colors.blue),
+        )
+      ],
+    );
+    final node = ARKitNode(
+      geometry: plane,
+      position: vector.Vector3(0, 0, 0),
+      //_getMiddlePlaneVector(nodes[0].position, nodes[1].position, nodes[2].position, nodes[3].position),
+      rotation: vector.Vector4(1.05, 0, 0, -math.pi / 2),
+    );
+    arkitController.add(node, parentNodeName: nodes[0].name);
+    setState(() {
+      finishPressed = false;
+    });
+  }
+
+  double _calculateDistanceBetweenPointsNumber(
+      vector.Vector3 A, vector.Vector3 B) {
+    final length = A.distanceTo(B);
+    return length;
+  }
+
   String _calculateDistanceBetweenPoints(vector.Vector3 A, vector.Vector3 B) {
     final length = A.distanceTo(B);
     return '${(length * 100).toStringAsFixed(2)} cm';
@@ -242,6 +280,14 @@ class _MyHomePageState extends State<MyHomePage> {
 
   vector.Vector3 _getMiddleVector(vector.Vector3 A, vector.Vector3 B) {
     return vector.Vector3((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2);
+  }
+
+  vector.Vector3 _getMiddlePlaneVector(
+      vector.Vector3 A, vector.Vector3 B, vector.Vector3 C, vector.Vector3 D) {
+    vector.Vector3 mid_one = _getMiddleVector(A, B);
+    vector.Vector3 mid_two = _getMiddleVector(C, D);
+    vector.Vector3 mid_average = _getMiddleVector(mid_one, mid_two);
+    return mid_average;
   }
 
   void _drawText(String text, vector.Vector3 point) {
@@ -263,13 +309,5 @@ class _MyHomePageState extends State<MyHomePage> {
       name: nodeCount.toString(),
     );
     arkitController.add(node);
-  }
-
-  Widget PlaneBuilder(List<ARKitNode> planes) {
-    return Stack(
-      children: const [
-        CircularProgressIndicator(),
-      ],
-    );
   }
 }

@@ -47,7 +47,11 @@ class _MyHomePageState extends State<MyHomePage> {
   vector.Vector3? lastPosition;
   vector.Vector3? secondLastPosition;
   vector.Vector3? firstPosition;
-  bool pressed = true;
+  List<ARKitNode> nodes = [];
+
+  bool undoAllowed = false;
+  bool finishAllowed = false;
+  bool finishPressed = false;
   int nodeCount = 0;
 
   @override
@@ -61,18 +65,21 @@ class _MyHomePageState extends State<MyHomePage> {
         appBar: AppBar(
           title: const Text('Measure Sample'),
         ),
-        body: Container(
-          child: ARKitSceneView(
-            enableTapRecognizer: true,
-            onARKitViewCreated: onARKitViewCreated,
-          ),
+        body: Stack(
+          children: [
+            ARKitSceneView(
+              enableTapRecognizer: true,
+              onARKitViewCreated: onARKitViewCreated,
+            ),
+            finishPressed ? Center(child: PlaneBuilder(nodes)) : Container(),
+          ],
         ),
         floatingActionButton: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             FloatingActionButton(
               onPressed: () {
-                if (nodeCount > 0 && !pressed) {
+                if (nodeCount > 0 && undoAllowed) {
                   if (nodeCount == 1) {
                     arkitController.remove('0');
                     lastPosition = null;
@@ -85,12 +92,42 @@ class _MyHomePageState extends State<MyHomePage> {
                     nodeCount -= 1;
                   }
                   setState(() {
-                    pressed = true;
+                    undoAllowed = false;
                   });
                 }
               },
-              child: Icon(Icons.cancel_outlined),
-              backgroundColor: pressed ? Colors.red : Colors.blueGrey,
+              child: const Icon(Icons.cancel_outlined),
+              backgroundColor: undoAllowed ? Colors.blueGrey : Colors.red,
+            ),
+            SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+            FloatingActionButton(
+              onPressed: () async {
+                if (nodeCount > 2) {
+                  final line = ARKitLine(
+                    fromVector: lastPosition!,
+                    toVector: firstPosition!,
+                    materials: [
+                      ARKitMaterial(
+                        lightingModelName: ARKitLightingModel.constant,
+                        diffuse: ARKitMaterialProperty.color(Colors.red),
+                      ),
+                    ],
+                  );
+                  final lineNode =
+                      ARKitNode(geometry: line, name: nodeCount.toString());
+                  arkitController.add(lineNode);
+                  setState(() {
+                    finishAllowed = false;
+                  });
+                  setState(() {
+                    finishPressed = true;
+                  });
+                } else {
+                  null;
+                }
+              },
+              child: const Icon(Icons.add_task_outlined),
+              backgroundColor: finishAllowed ? Colors.blueGrey : Colors.red,
             ),
             SizedBox(height: MediaQuery.of(context).size.height * 0.01),
             FloatingActionButton(
@@ -105,11 +142,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   lastPosition = null;
                   nodeCount = 0;
                   setState(() {
-                    pressed = true;
+                    undoAllowed = false;
                   });
                 }
               },
-              child: Icon(Icons.refresh),
+              child: const Icon(Icons.refresh),
               backgroundColor: Colors.blueGrey,
             ),
           ],
@@ -148,6 +185,7 @@ class _MyHomePageState extends State<MyHomePage> {
         name: nodeCount.toString(),
       );
       arkitController.add(node);
+      nodes.add(node);
 
       final line = ARKitLine(
         fromVector: lastPosition!,
@@ -168,7 +206,7 @@ class _MyHomePageState extends State<MyHomePage> {
       lastPosition = position;
       nodeCount += 1;
       setState(() {
-        pressed = false;
+        undoAllowed = true;
       });
     } else {
       final material = ARKitMaterial(
@@ -184,19 +222,17 @@ class _MyHomePageState extends State<MyHomePage> {
         name: nodeCount.toString(),
       );
       arkitController.add(node);
+      nodes.add(node);
       firstPosition = position;
       lastPosition = position;
       nodeCount += 1;
       setState(() {
-        pressed = false;
+        undoAllowed = true;
       });
     }
-  }
-
-  double _calculateDistanceBetweenPointsNumber(
-      vector.Vector3 A, vector.Vector3 B) {
-    final length = A.distanceTo(B);
-    return (length * 100);
+    if (nodeCount > 2) {
+      finishAllowed = true;
+    }
   }
 
   String _calculateDistanceBetweenPoints(vector.Vector3 A, vector.Vector3 B) {
@@ -227,5 +263,13 @@ class _MyHomePageState extends State<MyHomePage> {
       name: nodeCount.toString(),
     );
     arkitController.add(node);
+  }
+
+  Widget PlaneBuilder(List<ARKitNode> planes) {
+    return Stack(
+      children: const [
+        CircularProgressIndicator(),
+      ],
+    );
   }
 }
